@@ -5,7 +5,7 @@ This module handles dataset loading, model initialization, training loop,
 and saving results and trained model weights.
 """
 
-from stat_utils import get_class_accuracy, plot_confusion_matrix
+from evaluation_metrics import get_class_accuracy, plot_confusion_matrix
 from sklearn.metrics import confusion_matrix
 from torchvision.datasets import ImageFolder
 import torchvision.transforms as transforms
@@ -234,35 +234,6 @@ def save_training_results(train_loss_history, train_acc_epoch_history, cm,
                          train_acc, train_acc_batch_history):
     """
     Save all training results to files and plots.
-
-    Parameters
-    ----------
-    train_loss_history : list
-        Loss history per batch
-    train_acc_epoch_history : list
-        Accuracy history per epoch
-    cm : numpy.ndarray
-        Confusion matrix
-    num_classes : int
-        Number of classes
-    classes : list
-        Class names
-    class_acc : numpy.ndarray
-        Per-class accuracies
-    num_epochs : int
-        Number of epochs trained
-    batch_count : int
-        Number of batches per epoch
-    batch_size : int
-        Batch size used
-    learning_rate : float
-        Learning rate used
-    train_loss : float
-        Final training loss
-    train_acc : float
-        Final training accuracy
-    train_acc_batch_history : list
-        Accuracy history per batch
     """
     print("\nPlotting training data...")
 
@@ -289,7 +260,7 @@ def save_training_results(train_loss_history, train_acc_epoch_history, cm,
     plt.savefig('train_results/confusion_matrix.png')
     plt.close()
 
-    # Save training summary to text file
+    # Save training summary
     with open('train_results/training_summary.txt', "w") as f:
         f.write("Training Summary\n")
         f.write("-" * 46 + "\n")
@@ -335,7 +306,7 @@ def main():
     (train_loader, val_loader, test_loader, train_dataset, 
      val_dataset, test_dataset, classes) = load_and_prepare_data(batch_size)
 
-    # Save validation and test data for later use
+    # Save validation and test data
     save_split_data(val_dataset, val_loader, test_dataset, test_loader, 
                    batch_size, num_epochs, classes)
 
@@ -413,7 +384,7 @@ def main():
     torch.save(model.state_dict(), 
               "model/resnet50_food_classification_trained.pth")
 
-    print("\nPlease run validate.py to validate the newly trained model.")
+    print("\nPlease run model_validation.py to validate the newly trained model.")
 
 
 if __name__ == "__main__":
