@@ -1,3 +1,10 @@
+"""
+Testing script for ResNet50 food classification model.
+
+This module loads the trained model and evaluates it on the test dataset,
+saving detailed results including confusion matrix and per-class accuracies.
+"""
+
 from stat_utils import get_class_accuracy, plot_confusion_matrix
 from sklearn.metrics import confusion_matrix
 import torchvision.models as models
@@ -7,130 +14,262 @@ import torch
 import sys
 import os
 
-print("\nLoading test dataset...")
 
-try:
-    with open('pickle/test.pkl', 'rb') as handle:
-        test_dataset = pk.load(handle)
-        test_loader = pk.load(handle)
-        batch_size = pk.load(handle)
-        num_epochs = pk.load(handle)
-        classes = pk.load(handle)
-except FileNotFoundError:
-    print("Test dataset not found. Please run train.py before running test.")
-    sys.exit()
+def load_test_data():
+    """
+    Load test dataset from pickle file.
 
-print("Loading fine-tuned model...")
+    Returns
+    -------
+    tuple
+        (test_dataset, test_loader, batch_size, num_epochs, classes)
+    """
+    print("\nLoading test dataset...")
 
-try:
-    model_dict = torch.load("model/resnet50_food_classification_trained.pth")
-except FileNotFoundError:
-    print("Fine-tuned model not found. Please run train.py before running test.")
-    sys.exit()
+    try:
+        with open('pickle/test.pkl', 'rb') as handle:
+            test_dataset = pk.load(handle)
+            test_loader = pk.load(handle)
+            batch_size = pk.load(handle)
+            num_epochs = pk.load(handle)
+            classes = pk.load(handle)
+        return test_dataset, test_loader, batch_size, num_epochs, classes
+    except FileNotFoundError:
+        print("Error: Test dataset not found.")
+        print("Please run train.py before running test.")
+        sys.exit(1)
 
-model = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V2)
 
-num_classes = len(classes)
+def load_trained_model(num_classes, device):
+    """
+    Load the trained ResNet50 model.
 
-#Number of inputs in the final layer of resnet50
-num_fc_inputs = model.fc.in_features
+    Parameters
+    ----------
+    num_classes : int
+        Number of output classes
+    device : torch.device
+        Device to load model on
 
-#Replace final layer of resnet50 with a new layer that has the same number of inputs and 10 outputs for our food categories
-model.fc = torch.nn.Linear(num_fc_inputs, num_classes)
+    Returns
+    -------
+    nn.Module
+        Loaded model
+    """
+    print("Loading fine-tuned model...")
 
-model.load_state_dict(model_dict)
+    try:
+        model_dict = torch.load(
+            "model/resnet50_food_classification_trained.pth",
+            map_location=device
+        )
+    except FileNotFoundError:
+        print("Error: Fine-tuned model not found.")
+        print("Please run train.py before running test.")
+        sys.exit(1)
 
-#Checks if GPU is available for training. If not it default to the CPU.
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    # Initialize model architecture
+    model = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V2)
+    num_fc_inputs = model.fc.in_features
+    model.fc = torch.nn.Linear(num_fc_inputs, num_classes)
 
-#Creates Cross-Entropy Loss criterion(the loss function)
-criterion = torch.nn.CrossEntropyLoss()
+    # Load trained weights
+    model.load_state_dict(model_dict)
+    model = model.to(device)
 
-test_loss_history = []
-test_acc_history = []
-y_pred = []
-y_true = []
+    return model
 
-print("Starting Testing...")
-print("\n---------------------------------------------")
-print("Batch Size: %d" % batch_size)
-print("---------------------------------------------\n")
 
-#Test
-model.eval()
-test_loss = 0
-test_correct = 0
-batch_count = 0
-with torch.no_grad():
+def test_model(model, test_loader, criterion, device):
+    """
+    Test the model on the test dataset.
+
+    Parameters
+    ----------
+    model : nn.Module
+        The model to test
+    test_loader : DataLoader
+        Test data loader
+    criterion : nn.Module
+        Loss function
+    device : torch.device
+        Device to test on
+
+    Returns
+    -------
+    tuple
+        (test_loss, test_accuracy, y_pred, y_true, batch_count)
+    """
+    model.eval()
+
+    running_loss = 0.0
+    correct_predictions = 0
+    batch_count = 0
+    y_pred = []
+    y_true = []
+
+    with torch.no_grad():
         for inputs, labels in test_loader:
-            batch_count+=1
+            batch_count += 1
+
+            # Move data to device
             inputs = inputs.to(device)
             labels = labels.to(device)
 
+            # Forward pass
             outputs = model(inputs)
             loss = criterion(outputs, labels)
 
-            test_loss += loss.item() * inputs.size(0)
-
+            # Calculate statistics
+            running_loss += loss.item() * inputs.size(0)
             _, preds = torch.max(outputs, 1)
-            test_correct += torch.sum(preds == labels.data)
+            correct_predictions += torch.sum(preds == labels.data)
 
-            y_pred+=[int(tensor) for tensor in preds]
-            y_true+=[int(tensor) for tensor in labels.data]
+            # Store predictions and labels
+            y_pred.extend([int(tensor) for tensor in preds])
+            y_true.extend([int(tensor) for tensor in labels.data])
 
-            test_loss = test_loss / len(test_loader.dataset)
-            test_acc = test_correct.double() / len(test_loader.dataset)
+    # Calculate metrics
+    test_loss = running_loss / len(test_loader.dataset)
+    test_accuracy = correct_predictions.double() / len(test_loader.dataset)
 
-            test_loss_history.append(test_loss) #Saves a list of the loss for each batch to be plotted following test
-            test_acc_history.append(test_acc)#Saves a list of the accuracy for each batch to be plotted when test is complete
-            print('Batch %d: Test Loss: %.4f, Test Acc: %.4f' % (batch_count,test_loss, test_acc))
-            
-    
-
-if os.path.exists("test_results") is not True:
-    os.mkdir("test_results")
-
-cm = confusion_matrix(y_true=y_true,y_pred=y_pred)
-class_acc = get_class_accuracy(y_true=y_true, y_pred=y_pred,num_classes=num_classes)
+    return test_loss, test_accuracy, y_pred, y_true, batch_count
 
 
-print("\n\nTesting Complete!")
-print("\nTest Summary")
-print("----------------------------------------------")
-print("Batch Size: %d" % batch_size)
+def save_test_results(test_loss_history, test_acc_history, cm, 
+                     num_classes, classes, class_acc, batch_count, 
+                     batch_size, test_loss, test_acc):
+    """
+    Save all test results to files and plots.
 
-print("\nTotal Test Loss: %.4f" % test_loss)
-print("Total Test Accuracy: %.2f%%" % (test_acc*100))
-print("----------------------------------------------")
-print("\nClass-wise Accuracy")
-print("----------------------------------------------")
-for i in range(num_classes):
-    print("\"%s\" Accuracy: %.2f%%" % (classes[i], class_acc[i]))
-print("----------------------------------------------")
+    Parameters
+    ----------
+    test_loss_history : list
+        Loss history
+    test_acc_history : list
+        Accuracy history
+    cm : numpy.ndarray
+        Confusion matrix
+    num_classes : int
+        Number of classes
+    classes : list
+        Class names
+    class_acc : numpy.ndarray
+        Per-class accuracies
+    batch_count : int
+        Number of batches
+    batch_size : int
+        Batch size used
+    test_loss : float
+        Final test loss
+    test_acc : float
+        Final test accuracy
+    """
+    print("\nPlotting test data...")
 
-print("\nPlotting Test data...")
+    # Create results directory
+    if not os.path.exists("test_results"):
+        os.makedirs("test_results")
 
-#Makes and saves a confusion matrix
-plot_confusion_matrix(cm, num_classes, classes) #imported from stat_utils.py
-plt.savefig('test_results/confusion_matrix.png')
+    # Plot confusion matrix
+    plot_confusion_matrix(cm, num_classes, classes)
+    plt.savefig('test_results/confusion_matrix.png')
+    plt.close()
 
-with open('test_results/test_summary.txt', "w") as f:
-    f.write("Test Summary\n")
-    f.write("----------------------------------------------\n")
-    f.write("Batch Size: %d\n" % batch_size)
-    f.write("\nTotal Test Loss: %.4f\n" % test_loss)
-    f.write("Total Test Accuracy: %.2f%%\n" % (test_acc*100))
-    f.write("----------------------------------------------\n")
-    f.write("\nClass-wise Accuracy\n")
-    f.write("----------------------------------------------\n")
+    # Save test summary to text file
+    with open('test_results/test_summary.txt', "w") as f:
+        f.write("Test Summary\n")
+        f.write("-" * 46 + "\n")
+        f.write(f"Batch Size: {batch_size}\n")
+        f.write(f"\nTotal Test Loss: {test_loss:.4f}\n")
+        f.write(f"Total Test Accuracy: {test_acc * 100:.2f}%\n")
+        f.write("-" * 46 + "\n")
+
+        f.write("\nClass-wise Accuracy\n")
+        f.write("-" * 46 + "\n")
+        for i in range(num_classes):
+            f.write(f'"{classes[i]}" Accuracy: {class_acc[i]:.2f}%\n')
+        f.write("-" * 46 + "\n")
+
+        f.write("\nTest History\n")
+        f.write("-" * 46 + "\n")
+        for batch in range(batch_count):
+            f.write(
+                f'Batch {batch + 1}: '
+                f'Test Loss: {test_loss_history[batch]:.4f}, '
+                f'Test Acc: {test_acc_history[batch]:.4f}\n'
+            )
+
+    print("Test data saved to \"test_results\" folder")
+
+
+def main():
+    """Main testing function."""
+    # Load test data
+    test_dataset, test_loader, batch_size, num_epochs, classes = load_test_data()
+
+    # Setup device
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
+
+    # Load trained model
+    num_classes = len(classes)
+    model = load_trained_model(num_classes, device)
+
+    # Setup loss function
+    criterion = torch.nn.CrossEntropyLoss()
+
+    # Testing setup
+    test_loss_history = []
+    test_acc_history = []
+
+    print("Starting testing...")
+    print("\n" + "-" * 45)
+    print(f"Batch Size: {batch_size}")
+    print("-" * 45 + "\n")
+
+    # Run test
+    test_loss, test_acc, y_pred, y_true, batch_count = test_model(
+        model, test_loader, criterion, device
+    )
+
+    # Store metrics
+    test_loss_history.append(test_loss)
+    test_acc_history.append(test_acc)
+
+    print(
+        f'Batch {batch_count}: '
+        f'Test Loss: {test_loss:.4f}, '
+        f'Test Acc: {test_acc:.4f}'
+    )
+
+    # Calculate final metrics
+    cm = confusion_matrix(y_true=y_true, y_pred=y_pred)
+    class_acc = get_class_accuracy(
+        y_true=y_true, y_pred=y_pred, num_classes=num_classes
+    )
+
+    # Print summary
+    print("\n\nTesting Complete!")
+    print("\nTest Summary")
+    print("-" * 46)
+    print(f"Batch Size: {batch_size}")
+    print(f"\nTotal Test Loss: {test_loss:.4f}")
+    print(f"Total Test Accuracy: {test_acc * 100:.2f}%")
+    print("-" * 46)
+
+    print("\nClass-wise Accuracy")
+    print("-" * 46)
     for i in range(num_classes):
-        f.write("\"%s\" Accuracy: %.2f%%\n" % (classes[i], class_acc[i]))
-    f.write("----------------------------------------------\n")
-    f.write("\nTest History\n")
-    f.write("----------------------------------------------\n")
+        print(f'"{classes[i]}" Accuracy: {class_acc[i]:.2f}%')
+    print("-" * 46)
 
-    for batch in range((batch_count)):
-            f.write('Batch %d: Test Loss: %.4f, Test Acc: %.4f\n' 
-                    % (batch+1,test_loss_history[batch], test_acc_history[batch]))
+    # Save results
+    save_test_results(
+        test_loss_history, test_acc_history, cm, num_classes, 
+        classes, class_acc, batch_count, batch_size, test_loss, test_acc
+    )
 
-print("\nTest data saved to \"test_results\" folder")
+
+if __name__ == "__main__":
+    main()
