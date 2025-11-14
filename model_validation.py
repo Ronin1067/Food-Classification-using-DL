@@ -5,7 +5,7 @@ This module loads the trained model and evaluates it on the validation dataset,
 saving detailed results including confusion matrix and per-class accuracies.
 """
 
-from stat_utils import get_class_accuracy, plot_confusion_matrix
+from evaluation_metrics import get_class_accuracy, plot_confusion_matrix
 from sklearn.metrics import confusion_matrix
 import torchvision.models as models
 import matplotlib.pyplot as plt
@@ -16,14 +16,7 @@ import os
 
 
 def load_validation_data():
-    """
-    Load validation dataset from pickle file.
-
-    Returns
-    -------
-    tuple
-        (val_dataset, val_loader, batch_size, num_epochs, classes)
-    """
+    """Load validation dataset from pickle file."""
     print("\nLoading validation dataset...")
 
     try:
@@ -36,26 +29,12 @@ def load_validation_data():
         return val_dataset, val_loader, batch_size, num_epochs, classes
     except FileNotFoundError:
         print("Error: Validation dataset not found.")
-        print("Please run train.py before running validation.")
+        print("Please run model_training.py before running validation.")
         sys.exit(1)
 
 
 def load_trained_model(num_classes, device):
-    """
-    Load the trained ResNet50 model.
-
-    Parameters
-    ----------
-    num_classes : int
-        Number of output classes
-    device : torch.device
-        Device to load model on
-
-    Returns
-    -------
-    nn.Module
-        Loaded model
-    """
+    """Load the trained ResNet50 model."""
     print("Loading fine-tuned model...")
 
     try:
@@ -65,7 +44,7 @@ def load_trained_model(num_classes, device):
         )
     except FileNotFoundError:
         print("Error: Fine-tuned model not found.")
-        print("Please run train.py before running validation.")
+        print("Please run model_training.py before running validation.")
         sys.exit(1)
 
     # Initialize model architecture
@@ -81,25 +60,7 @@ def load_trained_model(num_classes, device):
 
 
 def validate_epoch(model, val_loader, criterion, device):
-    """
-    Validate the model for one epoch.
-
-    Parameters
-    ----------
-    model : nn.Module
-        The model to validate
-    val_loader : DataLoader
-        Validation data loader
-    criterion : nn.Module
-        Loss function
-    device : torch.device
-        Device to validate on
-
-    Returns
-    -------
-    tuple
-        (val_loss, val_accuracy, y_pred, y_true, batch_count)
-    """
+    """Validate the model for one epoch."""
     model.eval()
 
     running_loss = 0.0
@@ -139,34 +100,7 @@ def validate_epoch(model, val_loader, criterion, device):
 def save_validation_results(val_loss_history, val_acc_history, cm, 
                            num_classes, classes, class_acc, num_epochs, 
                            batch_count, batch_size, val_loss, val_acc):
-    """
-    Save all validation results to files and plots.
-
-    Parameters
-    ----------
-    val_loss_history : list
-        Loss history per epoch
-    val_acc_history : list
-        Accuracy history per epoch
-    cm : numpy.ndarray
-        Confusion matrix
-    num_classes : int
-        Number of classes
-    classes : list
-        Class names
-    class_acc : numpy.ndarray
-        Per-class accuracies
-    num_epochs : int
-        Number of epochs
-    batch_count : int
-        Number of batches per epoch
-    batch_size : int
-        Batch size used
-    val_loss : float
-        Final validation loss
-    val_acc : float
-        Final validation accuracy
-    """
+    """Save all validation results to files and plots."""
     print("\nPlotting validation data...")
 
     # Create results directory
@@ -178,7 +112,7 @@ def save_validation_results(val_loss_history, val_acc_history, cm,
     plt.savefig('val_results/confusion_matrix.png')
     plt.close()
 
-    # Save validation summary to text file
+    # Save validation summary
     with open('val_results/val_summary.txt', "w") as f:
         f.write("Validation Summary\n")
         f.write("-" * 46 + "\n")
@@ -281,7 +215,7 @@ def main():
         val_loss, val_acc
     )
 
-    print("\nPlease run test.py to test model.")
+    print("\nPlease run model_testing.py to test model.")
 
 
 if __name__ == "__main__":
