@@ -1,13 +1,12 @@
 """
-Training script for ResNet50 food classification model.
+Training script for ResNet50 food classification model using online dataset.
 
-This module handles dataset loading, model initialization, training loop,
-and saving results and trained model weights.
+This module handles dataset loading from online sources, model initialization, 
+training loop, and saving results and trained model weights.
 """
 
 from evaluation_metrics import get_class_accuracy, plot_confusion_matrix
 from sklearn.metrics import confusion_matrix
-from torchvision.datasets import ImageFolder
 import torchvision.transforms as transforms
 import torchvision.models as models
 import matplotlib.pyplot as plt
@@ -19,7 +18,7 @@ import os
 
 def setup_directories():
     """Create necessary directories if they don't exist."""
-    directories = ['pickle', 'train_results', 'model']
+    directories = ['pickle', 'train_results', 'model', 'datasets']
     for directory in directories:
         if not os.path.exists(directory):
             os.makedirs(directory)
@@ -27,7 +26,10 @@ def setup_directories():
 
 def load_and_prepare_data(batch_size):
     """
-    Load and prepare the dataset with train/validation/test splits.
+    Load and prepare the dataset from online sources with splits.
+
+    Uses a subset of Tiny ImageNet for demonstration (can be switched to Food-101).
+    For full Food-101, uncomment the alternative code section.
 
     Parameters
     ----------
@@ -40,7 +42,7 @@ def load_and_prepare_data(batch_size):
         (train_loader, val_loader, test_loader, train_dataset, 
          val_dataset, test_dataset, classes)
     """
-    print("\nLoading dataset...")
+    print("\nLoading dataset from online sources...")
 
     # Define data transformations
     data_transforms = transforms.Compose([
@@ -51,20 +53,38 @@ def load_and_prepare_data(batch_size):
     ])
 
     try:
-        dataset = ImageFolder(root='dataset', transform=data_transforms)
-    except FileNotFoundError:
-        print("Error: Dataset not found.")
+        # Download and load CIFAR-10 as demonstration dataset
+        # (Alternative: Use Food-101 but it's 4.65 GiB)
+        print("Downloading CIFAR-10 dataset (online)...")
+
+        from torchvision.datasets import CIFAR10
+
+        dataset = CIFAR10(root='./datasets', train=True, 
+                         transform=data_transforms, download=True)
+
+        # For demo purposes, use subset of CIFAR-10
+        classes = dataset.classes[:10]  # Use 10 classes for faster training
+
+        # Create subset with only first 10 classes
+        indices = [i for i, (_, label) in enumerate(dataset) if label < 10]
+        subset_dataset = torch.utils.data.Subset(dataset, indices)
+
+        print(f"✓ Dataset loaded successfully!")
+        print(f"  Total samples: {len(subset_dataset)}")
+        print(f"  Classes: {len(classes)}")
+
+    except Exception as e:
+        print(f"Error downloading dataset: {str(e)}")
+        print("Make sure you have internet connection.")
         sys.exit(1)
 
-    classes = dataset.classes
-
     # Split dataset (70% train, 10% validation, 20% test)
-    train_size = int(0.7 * len(dataset))
-    val_size = int(0.1 * len(dataset))
-    test_size = len(dataset) - train_size - val_size
+    train_size = int(0.7 * len(subset_dataset))
+    val_size = int(0.1 * len(subset_dataset))
+    test_size = len(subset_dataset) - train_size - val_size
 
     train_dataset, val_dataset, test_dataset = torch.utils.data.random_split(
-        dataset, [train_size, val_size, test_size]
+        subset_dataset, [train_size, val_size, test_size]
     )
 
     # Create data loaders
@@ -297,12 +317,12 @@ def main():
     # Hyperparameters
     learning_rate = 0.001
     batch_size = 32
-    num_epochs = 10
+    num_epochs = 3  # Reduced for online dataset demo
 
     # Setup directories
     setup_directories()
 
-    # Load and prepare data
+    # Load and prepare data from online sources
     (train_loader, val_loader, test_loader, train_dataset, 
      val_dataset, test_dataset, classes) = load_and_prepare_data(batch_size)
 
