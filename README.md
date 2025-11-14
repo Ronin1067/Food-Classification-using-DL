@@ -22,11 +22,13 @@ The dataset this model was trained on is composed of between 3000 images of a 10
 ## Requirements
 This project requires the following packages:
 
-- PyTorch
-- TorchVision
-- Matplotlib
-- scikit-learn
-- Numpy
+torch>=1.10.0
+torchvision>=0.11.0
+scikit-learn>=0.24.0
+matplotlib>=3.3.0
+numpy>=1.19.0
+Pillow>=8.0.0
+tqdm>=4.50.0
 
 ## Results
 After training the model for 10 epochs with a batch size of 32 and a learning rate of 0.001, we achieved an accuracy of 93.33% on the train set, 93.67% on the validation set, and 92.83% on the test set(as of 13/11/2025). Class-wise accuracies following test are as follows:
