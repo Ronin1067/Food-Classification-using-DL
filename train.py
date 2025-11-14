@@ -1,3 +1,10 @@
+"""
+Training script for ResNet50 food classification model.
+
+This module handles dataset loading, model initialization, training loop,
+and saving results and trained model weights.
+"""
+
 from stat_utils import get_class_accuracy, plot_confusion_matrix
 from sklearn.metrics import confusion_matrix
 from torchvision.datasets import ImageFolder
@@ -10,209 +17,404 @@ import sys
 import os
 
 
-learn_rate = 0.001
-batch_size = 32
-num_epochs = 10
+def setup_directories():
+    """Create necessary directories if they don't exist."""
+    directories = ['pickle', 'train_results', 'model']
+    for directory in directories:
+        if not os.path.exists(directory):
+            os.makedirs(directory)
 
 
-print("\nLoading dataset...")
+def load_and_prepare_data(batch_size):
+    """
+    Load and prepare the dataset with train/validation/test splits.
 
-data_transforms = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.Resize((224, 224), antialias=True),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  # normalize images
-])
+    Parameters
+    ----------
+    batch_size : int
+        Batch size for data loaders
 
-try:
-    dataset = ImageFolder(root='dataset', transform=data_transforms)
-except FileNotFoundError:
-    print("Dataset not found.")
-    sys.exit()
+    Returns
+    -------
+    tuple
+        (train_loader, val_loader, test_loader, train_dataset, 
+         val_dataset, test_dataset, classes)
+    """
+    print("\nLoading dataset...")
 
-classes = dataset.classes
+    # Define data transformations
+    data_transforms = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Resize((224, 224), antialias=True),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], 
+                           std=[0.229, 0.224, 0.225])
+    ])
 
-#Split original dataset into randomly split train(70% of original dataset), Validation(10% of dataset) and test(20% of dataset)
-train_size = int(0.7*len(dataset))
-val_size = int(0.1*len(dataset))
-test_size = int(0.2*len(dataset))
-train_dataset, val_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_size, val_size,test_size])
+    try:
+        dataset = ImageFolder(root='dataset', transform=data_transforms)
+    except FileNotFoundError:
+        print("Error: Dataset not found.")
+        sys.exit(1)
 
-# Create data loaders for training, validation, and test sets with a batch size of 32
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    classes = dataset.classes
 
-if os.path.exists("pickle") is not True:
-    os.mkdir("pickle")
+    # Split dataset (70% train, 10% validation, 20% test)
+    train_size = int(0.7 * len(dataset))
+    val_size = int(0.1 * len(dataset))
+    test_size = len(dataset) - train_size - val_size
 
-#Saves our validation set, loader, batch size and number of epochs so we can use it later in validate.py
-with open('pickle/validate.pkl', 'wb') as handle:
-    pk.dump(val_dataset, handle)
-    pk.dump(val_loader, handle)
-    pk.dump(batch_size, handle)
-    pk.dump(num_epochs, handle)
-    pk.dump(classes, handle)
+    train_dataset, val_dataset, test_dataset = torch.utils.data.random_split(
+        dataset, [train_size, val_size, test_size]
+    )
 
+    # Create data loaders
+    train_loader = torch.utils.data.DataLoader(
+        train_dataset, batch_size=batch_size, shuffle=True
+    )
+    val_loader = torch.utils.data.DataLoader(
+        val_dataset, batch_size=batch_size, shuffle=False
+    )
+    test_loader = torch.utils.data.DataLoader(
+        test_dataset, batch_size=batch_size, shuffle=False
+    )
 
-#Saves our test set, loader, batch size and number of epochs so we can use it later in test.py
-with open('pickle/test.pkl', 'wb') as handle:
-    pk.dump(test_dataset, handle)
-    pk.dump(test_loader, handle)
-    pk.dump(batch_size, handle)
-    pk.dump(num_epochs, handle)
-    pk.dump(classes, handle)
-
-print("Loading pre-trained model...")
-resnet50 = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V2) #Loads pre-trained model ResNet50 with ImageNet weights
-
-#Freezes all pre-trained layers of the original model so they don't get trained
-for param in resnet50.parameters():
-    param.requires_grad = False
-
-#Our 10 food categories
-num_classes = len(dataset.classes)
-
-#Number of inputs in the final layer of resnet50
-num_fc_inputs = resnet50.fc.in_features
-
-#Replace final layer of resnet50 with a new layer that has the same number of inputs and 10 outputs for our food categories
-resnet50.fc = torch.nn.Linear(num_fc_inputs, num_classes)
-
-#Creates stochastic gradient descent optimizer for final training layer, with a learn rate of 0.001 and a momentum coeffcient of 0.9
-#Momentum coeffcient is multiplied by the previous gradient and then added to current gradient to avoid getting trapped in local minima
-optimizer = torch.optim.SGD(resnet50.fc.parameters(), lr=learn_rate, momentum=0.9)
-
-#Checks if GPU is available for training. If not it default to the CPU.
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-#Creates Cross-Entropy Loss criterion(the loss function)
-criterion = torch.nn.CrossEntropyLoss()
+    return (train_loader, val_loader, test_loader, train_dataset, 
+            val_dataset, test_dataset, classes)
 
 
-train_loss_history = []
-train_acc_epoch_history = []
-train_acc_batch_history = []
-y_pred = []
-y_true = []
-print("Starting Training...")
-print("\n---------------------------------------------")
-print("Number of Epochs: %d" % num_epochs)
-print("Batch Size: %d" % batch_size)
-print("Learning rate: %.3f" % learn_rate)
-print("---------------------------------------------\n")
+def save_split_data(val_dataset, val_loader, test_dataset, test_loader, 
+                   batch_size, num_epochs, classes):
+    """
+    Save validation and test datasets for later use.
 
-for epoch in range(num_epochs):
-    resnet50.train() # Puts the model to train mode
-    train_loss = 0
-    train_correct = 0
+    Parameters
+    ----------
+    val_dataset : Dataset
+        Validation dataset
+    val_loader : DataLoader
+        Validation data loader
+    test_dataset : Dataset
+        Test dataset
+    test_loader : DataLoader
+        Test data loader
+    batch_size : int
+        Batch size
+    num_epochs : int
+        Number of epochs
+    classes : list
+        List of class names
+    """
+    # Save validation data
+    with open('pickle/validate.pkl', 'wb') as handle:
+        pk.dump(val_dataset, handle)
+        pk.dump(val_loader, handle)
+        pk.dump(batch_size, handle)
+        pk.dump(num_epochs, handle)
+        pk.dump(classes, handle)
+
+    # Save test data
+    with open('pickle/test.pkl', 'wb') as handle:
+        pk.dump(test_dataset, handle)
+        pk.dump(test_loader, handle)
+        pk.dump(batch_size, handle)
+        pk.dump(num_epochs, handle)
+        pk.dump(classes, handle)
+
+
+def initialize_model(num_classes, learning_rate, device):
+    """
+    Initialize ResNet50 model with transfer learning setup.
+
+    Parameters
+    ----------
+    num_classes : int
+        Number of output classes
+    learning_rate : float
+        Learning rate for optimizer
+    device : torch.device
+        Device to train on (CPU or GPU)
+
+    Returns
+    -------
+    tuple
+        (model, optimizer, criterion)
+    """
+    print("Loading pre-trained model...")
+
+    # Load pre-trained ResNet50
+    model = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V2)
+
+    # Freeze all pre-trained layers
+    for param in model.parameters():
+        param.requires_grad = False
+
+    # Replace final layer
+    num_fc_inputs = model.fc.in_features
+    model.fc = torch.nn.Linear(num_fc_inputs, num_classes)
+
+    # Move model to device
+    model = model.to(device)
+
+    # Setup optimizer and loss function
+    optimizer = torch.optim.SGD(
+        model.fc.parameters(), lr=learning_rate, momentum=0.9
+    )
+    criterion = torch.nn.CrossEntropyLoss()
+
+    return model, optimizer, criterion
+
+
+def train_epoch(model, train_loader, criterion, optimizer, device):
+    """
+    Train the model for one epoch.
+
+    Parameters
+    ----------
+    model : nn.Module
+        The model to train
+    train_loader : DataLoader
+        Training data loader
+    criterion : nn.Module
+        Loss function
+    optimizer : torch.optim.Optimizer
+        Optimizer
+    device : torch.device
+        Device to train on
+
+    Returns
+    -------
+    tuple
+        (epoch_loss, epoch_accuracy, y_pred, y_true, batch_count)
+    """
+    model.train()
+
+    running_loss = 0.0
+    correct_predictions = 0
     batch_count = 0
+    y_pred = []
+    y_true = []
 
-
-    #Training
     for inputs, labels in train_loader:
-        batch_count+=1
-        inputs = inputs.to(device) #loads input on to GPU if available
-        labels = labels.to(device) #loads labels on to GPU if available
-        
-        optimizer.zero_grad() #Sets gradients to zero at the start of each batch
-        outputs = resnet50(inputs) #Feeds batch input into the model returns output probilities(10 for each food item)
-        loss = criterion(outputs, labels) #Finds the loss between the model's output and the true label.
-        loss.backward() #Back-propagation. Computes the gradients of the loss
-        optimizer.step() #Updates model using the gradients
+        batch_count += 1
+
+        # Move data to device
+        inputs = inputs.to(device)
+        labels = labels.to(device)
+
+        # Zero gradients
+        optimizer.zero_grad()
+
+        # Forward pass
+        outputs = model(inputs)
+        loss = criterion(outputs, labels)
+
+        # Backward pass and optimization
+        loss.backward()
+        optimizer.step()
+
+        # Calculate statistics
+        running_loss += loss.item() * inputs.size(0)
+        _, preds = torch.max(outputs, 1)
+        correct_predictions += torch.sum(preds == labels.data)
+
+        # Store predictions and labels
+        y_pred.extend([int(tensor) for tensor in preds])
+        y_true.extend([int(tensor) for tensor in labels.data])
+
+    # Calculate epoch metrics
+    epoch_loss = running_loss / len(train_loader.dataset)
+    epoch_accuracy = correct_predictions.double() / len(train_loader.dataset)
+
+    return epoch_loss, epoch_accuracy, y_pred, y_true, batch_count
 
 
-        train_loss += loss.item() * inputs.size(0)  #Calculates a running total for loss for each epoch. 
-                                                    #Loss for a single input * batch size + total loss so far
+def save_training_results(train_loss_history, train_acc_epoch_history, cm, 
+                         num_classes, classes, class_acc, num_epochs, 
+                         batch_count, batch_size, learning_rate, train_loss, 
+                         train_acc, train_acc_batch_history):
+    """
+    Save all training results to files and plots.
 
-        _, preds=torch.max(outputs, 1) #Find output with the highest probablity and save it as the predicted value for the food item.
-        train_correct += torch.sum(preds == labels.data) # Counts how many predictions matched the true values
+    Parameters
+    ----------
+    train_loss_history : list
+        Loss history per batch
+    train_acc_epoch_history : list
+        Accuracy history per epoch
+    cm : numpy.ndarray
+        Confusion matrix
+    num_classes : int
+        Number of classes
+    classes : list
+        Class names
+    class_acc : numpy.ndarray
+        Per-class accuracies
+    num_epochs : int
+        Number of epochs trained
+    batch_count : int
+        Number of batches per epoch
+    batch_size : int
+        Batch size used
+    learning_rate : float
+        Learning rate used
+    train_loss : float
+        Final training loss
+    train_acc : float
+        Final training accuracy
+    train_acc_batch_history : list
+        Accuracy history per batch
+    """
+    print("\nPlotting training data...")
 
-        y_pred+=preds
-        y_true+=labels.data
+    # Plot loss history
+    plt.figure()
+    plt.plot(train_loss_history)
+    plt.title('Training Loss History')
+    plt.xlabel('Batches')
+    plt.ylabel('Training Loss')
+    plt.savefig("train_results/train_loss.png")
+    plt.close()
 
-        train_loss = train_loss / len(train_loader.dataset) # Calculates mean loss
-        train_acc = train_correct.double() / len(train_loader.dataset) #Calculates accuracy
+    # Plot accuracy history
+    plt.figure()
+    plt.plot(train_acc_epoch_history)
+    plt.title('Training Accuracy History')
+    plt.xlabel('Epochs')
+    plt.ylabel('Training Accuracy')
+    plt.savefig("train_results/train_acc.png")
+    plt.close()
 
-        train_loss_history.append(train_loss) #Saves a list of the loss for each batch to be plotted when training is complete
-        train_acc_batch_history.append(train_acc)#Saves a list of the accuracy for each batch
+    # Plot confusion matrix
+    plot_confusion_matrix(cm, num_classes, classes)
+    plt.savefig('train_results/confusion_matrix.png')
+    plt.close()
 
-        # Print training results for this batch
-        print('Epoch %d - (Batch %d): Training Loss: %.4f, Training Acc: %.4f' % (epoch+1,batch_count,train_loss, train_acc))
-        
+    # Save training summary to text file
+    with open('train_results/training_summary.txt', "w") as f:
+        f.write("Training Summary\n")
+        f.write("-" * 46 + "\n")
+        f.write(f"Number of Epochs: {num_epochs}\n")
+        f.write(f"Number of Batches per Epoch: {batch_count}\n")
+        f.write(f"Batch Size: {batch_size}\n")
+        f.write(f"Learning Rate: {learning_rate:.3f}\n")
+        f.write(f"\nTotal Training Loss: {train_loss:.4f}\n")
+        f.write(f"Total Training Accuracy: {train_acc * 100:.2f}%\n")
+        f.write("-" * 46 + "\n")
 
-    train_acc_epoch_history.append(train_acc)#Saves a list of the accuracy for each epoch to be plotted when training is complete
+        f.write("\nClass-wise Accuracy\n")
+        f.write("-" * 46 + "\n")
+        for i in range(num_classes):
+            f.write(f'"{classes[i]}" Accuracy: {class_acc[i]:.2f}%\n')
+        f.write("-" * 46 + "\n")
 
-cm = confusion_matrix(y_true=y_true,y_pred=y_pred)
-class_acc = get_class_accuracy(y_true=y_true, y_pred=y_pred, num_classes=num_classes)
+        f.write("\nTraining History\n")
+        f.write("-" * 46 + "\n")
+        for epoch in range(num_epochs):
+            for batch in range(batch_count):
+                idx = (epoch * batch_count) + batch
+                f.write(
+                    f'Epoch {epoch + 1} - (Batch {batch + 1}): '
+                    f'Training Loss: {train_loss_history[idx]:.4f}, '
+                    f'Training Acc: {train_acc_batch_history[idx]:.4f}\n'
+                )
 
-print("\n\nTraining Complete!")
-print("----------------------------------------------")
-print("Number of Epochs: %d" % num_epochs)
-print("Number of Batches per Epoch: %d" % (batch_count))
-print("Batch Size: %d" % batch_size)
-print("Learning rate: %.3f" % learn_rate)
+    print("Training data saved to \"train_results\" folder")
 
-print("\nTraining Loss: %.4f" % train_loss)
-print("Training Accuracy: %.2f%%" % (train_acc*100))
-print("----------------------------------------------")
-print("\nClass-wise Accuracy")
-print("----------------------------------------------")
-for i in range(num_classes):
-    print("\"%s\" Accuracy: %.2f%%" % (classes[i], class_acc[i]))
-print("----------------------------------------------")
 
-if os.path.exists("train_results") is not True:
-    os.mkdir("train_results")
+def main():
+    """Main training function."""
+    # Hyperparameters
+    learning_rate = 0.001
+    batch_size = 32
+    num_epochs = 10
 
-print("\nPlotting Training data...")
+    # Setup directories
+    setup_directories()
 
-plt.plot(train_loss_history)
-plt.title('Training Loss History')
-plt.xlabel('Batches')
-plt.ylabel('Training loss')
+    # Load and prepare data
+    (train_loader, val_loader, test_loader, train_dataset, 
+     val_dataset, test_dataset, classes) = load_and_prepare_data(batch_size)
 
-plt.savefig("train_results/train_loss.png")
+    # Save validation and test data for later use
+    save_split_data(val_dataset, val_loader, test_dataset, test_loader, 
+                   batch_size, num_epochs, classes)
 
-plt.clf()
+    # Setup device
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
 
-plt.plot(train_acc_epoch_history)
-plt.title('Training Accuracy History')
-plt.xlabel('Epochs')
-plt.ylabel('Training Accuracy')
+    # Initialize model
+    num_classes = len(classes)
+    model, optimizer, criterion = initialize_model(
+        num_classes, learning_rate, device
+    )
 
-plt.savefig("train_results/train_acc.png")
+    # Training setup
+    train_loss_history = []
+    train_acc_epoch_history = []
+    train_acc_batch_history = []
 
-#Makes and saves a confusion matrix
-plot_confusion_matrix(cm, num_classes, classes) #imported from stat_utils.py
-plt.savefig('train_results/confusion_matrix.png')
+    print("Starting training...")
+    print("\n" + "-" * 45)
+    print(f"Number of Epochs: {num_epochs}")
+    print(f"Batch Size: {batch_size}")
+    print(f"Learning Rate: {learning_rate:.3f}")
+    print("-" * 45 + "\n")
 
-with open('train_results/training_summary.txt', "w") as f:
-    f.write("Training Summary\n")
-    f.write("----------------------------------------------\n")
-    f.write("Number of Epochs: %d\n" % num_epochs)
-    f.write("Number of Batches per Epoch: %d\n" % (batch_count))
-    f.write("Batch Size: %d\n" % batch_size)
-    f.write("\nTotal Training Loss: %.4f\n" % train_loss)
-    f.write("Total Training Accuracy: %.2f%%\n" % (train_acc*100))
-    f.write("----------------------------------------------\n")
-    f.write("\nClass-wise Accuracy\n")
-    f.write("----------------------------------------------\n")
-    for i in range(num_classes):
-        f.write("\"%s\" Accuracy: %.2f%%\n" % (classes[i], class_acc[i]))
-    f.write("----------------------------------------------\n")
-    f.write("\nTraining History\n")
-    f.write("----------------------------------------------\n")
+    # Training loop
     for epoch in range(num_epochs):
-        for batch in range((batch_count)):
-            f.write('Epoch %d - (Batch %d): Training Loss: %.4f, Training Acc: %.4f\n' 
-                    % (epoch+1,batch+1,train_loss_history[(epoch*batch_count)+batch], train_acc_batch_history[(epoch*batch_count)+batch]))
+        epoch_loss, epoch_acc, y_pred, y_true, batch_count = train_epoch(
+            model, train_loader, criterion, optimizer, device
+        )
 
-print("Training data saved to \"train_results\" folder")
-print("Saving fine-tuned model...")
+        # Store metrics
+        train_loss_history.append(epoch_loss)
+        train_acc_batch_history.append(epoch_acc)
+        train_acc_epoch_history.append(epoch_acc)
 
-if os.path.exists("model") is not True:
-    os.mkdir("model")
+        print(
+            f'Epoch {epoch + 1} - (Batch {batch_count}): '
+            f'Training Loss: {epoch_loss:.4f}, '
+            f'Training Acc: {epoch_acc:.4f}'
+        )
 
-torch.save(resnet50.state_dict(), "model/resnet50_food_classification_trained.pth") #Saves trained model
+    # Calculate final metrics
+    cm = confusion_matrix(y_true=y_true, y_pred=y_pred)
+    class_acc = get_class_accuracy(
+        y_true=y_true, y_pred=y_pred, num_classes=num_classes
+    )
 
-print("\nPlease run validate.py to validate the newly trained model.")
+    # Print summary
+    print("\n\nTraining Complete!")
+    print("-" * 46)
+    print(f"Number of Epochs: {num_epochs}")
+    print(f"Number of Batches per Epoch: {batch_count}")
+    print(f"Batch Size: {batch_size}")
+    print(f"Learning Rate: {learning_rate:.3f}")
+    print(f"\nTraining Loss: {epoch_loss:.4f}")
+    print(f"Training Accuracy: {epoch_acc * 100:.2f}%")
+    print("-" * 46)
+
+    print("\nClass-wise Accuracy")
+    print("-" * 46)
+    for i in range(num_classes):
+        print(f'"{classes[i]}" Accuracy: {class_acc[i]:.2f}%')
+    print("-" * 46)
+
+    # Save results
+    save_training_results(
+        train_loss_history, train_acc_epoch_history, cm, num_classes, 
+        classes, class_acc, num_epochs, batch_count, batch_size, 
+        learning_rate, epoch_loss, epoch_acc, train_acc_batch_history
+    )
+
+    # Save model
+    print("\nSaving fine-tuned model...")
+    torch.save(model.state_dict(), 
+              "model/resnet50_food_classification_trained.pth")
+
+    print("\nPlease run validate.py to validate the newly trained model.")
+
+
+if __name__ == "__main__":
+    main()
