@@ -1,5 +1,5 @@
 """
-Testing script for ResNet50 food classification model.
+Testing script for ResNet50 model using online dataset.
 
 This module loads the trained model and evaluates it on the test dataset,
 saving detailed results including confusion matrix and per-class accuracies.
@@ -47,12 +47,10 @@ def load_trained_model(num_classes, device):
         print("Please run model_training.py before running test.")
         sys.exit(1)
 
-    # Initialize model architecture
     model = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V2)
     num_fc_inputs = model.fc.in_features
     model.fc = torch.nn.Linear(num_fc_inputs, num_classes)
 
-    # Load trained weights
     model.load_state_dict(model_dict)
     model = model.to(device)
 
@@ -73,24 +71,19 @@ def test_model(model, test_loader, criterion, device):
         for inputs, labels in test_loader:
             batch_count += 1
 
-            # Move data to device
             inputs = inputs.to(device)
             labels = labels.to(device)
 
-            # Forward pass
             outputs = model(inputs)
             loss = criterion(outputs, labels)
 
-            # Calculate statistics
             running_loss += loss.item() * inputs.size(0)
             _, preds = torch.max(outputs, 1)
             correct_predictions += torch.sum(preds == labels.data)
 
-            # Store predictions and labels
             y_pred.extend([int(tensor) for tensor in preds])
             y_true.extend([int(tensor) for tensor in labels.data])
 
-    # Calculate metrics
     test_loss = running_loss / len(test_loader.dataset)
     test_accuracy = correct_predictions.double() / len(test_loader.dataset)
 
@@ -103,16 +96,13 @@ def save_test_results(test_loss_history, test_acc_history, cm,
     """Save all test results to files and plots."""
     print("\nPlotting test data...")
 
-    # Create results directory
     if not os.path.exists("test_results"):
         os.makedirs("test_results")
 
-    # Plot confusion matrix
     plot_confusion_matrix(cm, num_classes, classes)
     plt.savefig('test_results/confusion_matrix.png')
     plt.close()
 
-    # Save test summary
     with open('test_results/test_summary.txt', "w") as f:
         f.write("Test Summary\n")
         f.write("-" * 46 + "\n")
@@ -125,37 +115,22 @@ def save_test_results(test_loss_history, test_acc_history, cm,
         f.write("-" * 46 + "\n")
         for i in range(num_classes):
             f.write(f'"{classes[i]}" Accuracy: {class_acc[i]:.2f}%\n')
-        f.write("-" * 46 + "\n")
-
-        f.write("\nTest History\n")
-        f.write("-" * 46 + "\n")
-        for batch in range(batch_count):
-            f.write(
-                f'Batch {batch + 1}: '
-                f'Test Loss: {test_loss_history[batch]:.4f}, '
-                f'Test Acc: {test_acc_history[batch]:.4f}\n'
-            )
 
     print("Test data saved to \"test_results\" folder")
 
 
 def main():
     """Main testing function."""
-    # Load test data
     test_dataset, test_loader, batch_size, num_epochs, classes = load_test_data()
 
-    # Setup device
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    # Load trained model
     num_classes = len(classes)
     model = load_trained_model(num_classes, device)
 
-    # Setup loss function
     criterion = torch.nn.CrossEntropyLoss()
 
-    # Testing setup
     test_loss_history = []
     test_acc_history = []
 
@@ -164,12 +139,10 @@ def main():
     print(f"Batch Size: {batch_size}")
     print("-" * 45 + "\n")
 
-    # Run test
     test_loss, test_acc, y_pred, y_true, batch_count = test_model(
         model, test_loader, criterion, device
     )
 
-    # Store metrics
     test_loss_history.append(test_loss)
     test_acc_history.append(test_acc)
 
@@ -179,13 +152,11 @@ def main():
         f'Test Acc: {test_acc:.4f}'
     )
 
-    # Calculate final metrics
     cm = confusion_matrix(y_true=y_true, y_pred=y_pred)
     class_acc = get_class_accuracy(
         y_true=y_true, y_pred=y_pred, num_classes=num_classes
     )
 
-    # Print summary
     print("\n\nTesting Complete!")
     print("\nTest Summary")
     print("-" * 46)
@@ -200,7 +171,6 @@ def main():
         print(f'"{classes[i]}" Accuracy: {class_acc[i]:.2f}%')
     print("-" * 46)
 
-    # Save results
     save_test_results(
         test_loss_history, test_acc_history, cm, num_classes, 
         classes, class_acc, batch_count, batch_size, test_loss, test_acc
