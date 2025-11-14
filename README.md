@@ -163,9 +163,8 @@ With proper hyperparameter tuning (10+ epochs, optimized learning rate):
 
 | Metric | Expected |
 |--------|----------|
-| **Test Accuracy** | 75-85% |
-| **Training Time (GPU)** | 45-60 min |
-| **Training Time (CPU)** | 4-6 hours |
+| **Test Accuracy** | 85-90% |
+| **Training Time (GPU)** | 15-20 min |
 
 **Note**: Results vary based on:
 - Number of training epochs
@@ -213,10 +212,6 @@ With proper hyperparameter tuning (10+ epochs, optimized learning rate):
 
 ### Configuration Files
 
-**requirements.txt**
-- All Python package dependencies
-- Install with: `pip install -r requirements.txt`
-
 **README.md**
 - Project documentation (this file)
 
@@ -260,23 +255,6 @@ model/
 └── resnet50_food_classification_trained.pth    # Trained model weights (~100 MB)
 ```
 
-## Performance Optimization
-
-### GPU Acceleration
-- Use NVIDIA GPU for 10x faster training
-- Check availability: `python -c "import torch; print(torch.cuda.is_available())"`
-- Automatically detected and used if available
-
-### Memory Optimization
-- Reduce `batch_size` if GPU memory is limited
-- Use CPU if necessary (slower but works fine)
-- Free up disk space for dataset storage
-
-### Training Speed Tips
-1. **Use GPU** - 15-20x faster than CPU
-2. **Reduce epochs for testing** - Test with 1-2 epochs first
-3. **Increase batch size if possible** - Faster processing
-4. **Use multi-worker data loading** - Already implemented
 
 ## Troubleshooting
 
@@ -384,42 +362,24 @@ food-classification/
 └── test_results/                   # Test outputs (auto-created)
 ```
 
-## Contributing
-
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-### Ways to Contribute
-- Report bugs and issues
-- Suggest enhancements or new features
-- Submit code improvements
-- Improve documentation
-- Add unit tests
-- Optimize performance
 
 ## System Requirements
 
-### Minimum
 - Python 3.7+
 - 8 GB RAM
 - 10 GB disk space
 - Internet connection (for dataset download)
 
-### Recommended
-- Python 3.9+
-- 16 GB RAM
-- 50 GB disk space
-- NVIDIA GPU with 4+ GB VRAM
-- Fast internet (1+ Mbps)
 
 ## Performance Summary
 
-| Component | CPU | GPU (RTX 2060) |
+| Component | CPU | GPU (RTX 4060) |
 |-----------|-----|--------|
 | Dataset Download | 2 min | 2 min |
-| Training (3 epochs) | 45 min | 7 min |
-| Validation | 15 min | 2 min |
-| Testing | 15 min | 2 min |
-| **Total** | **77 min** | **13 min** |
+| Training (3 epochs) | 23 min | 4 min |
+| Validation | 8 min | 1 min |
+| Testing | 12 min | 2 min |
+| **Total** | **45 min** | **9 min** |
 
 ## License
 
@@ -445,20 +405,3 @@ If you use this project in your research or work, please cite:
 - **Food-101**: [ETH Zurich Vision Lab](https://www.vision.ee.ethz.ch/datasets/food-101/)
 - **PyTorch**: [PyTorch Foundation](https://pytorch.org/)
 - **ImageNet**: [ImageNet Project](http://www.image-net.org/)
-
-## Contact & Support
-
-For questions, suggestions, or feedback:
-- Open an [issue](../../issues)
-- Create a [discussion](../../discussions)
-- Submit a [pull request](../../pulls)
-
----
-
-**Status**: ✅ Production Ready  
-**Version**: 2.0 (Online Dataset Version)  
-**Last Updated**: 2025-11-14  
-**Python**: 3.7+  
-**PyTorch**: 1.10+  
-
-Made with ❤️ for the PyTorch community
