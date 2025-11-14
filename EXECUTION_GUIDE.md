@@ -323,39 +323,7 @@ food-classification/
     └── test_summary.txt
 ```
 
-## Typical Performance Metrics
 
-### By Hardware
-
-#### GPU (NVIDIA RTX 2060)
-```
-Dataset Download:  2 minutes
-Training:          7 minutes
-Validation:        2 minutes
-Testing:           2 minutes
-Total Time:        13 minutes
-Accuracy:          ~65-70%
-```
-
-#### CPU (Intel i7, 4 cores)
-```
-Dataset Download:  2 minutes
-Training:          45 minutes
-Validation:        15 minutes
-Testing:           15 minutes
-Total Time:        77 minutes
-Accuracy:          ~65-70% (same)
-```
-
-#### Laptop CPU (Intel i5, 2 cores)
-```
-Dataset Download:  2 minutes
-Training:          60 minutes
-Validation:        20 minutes
-Testing:           20 minutes
-Total Time:        102 minutes
-Accuracy:          ~65-70% (same)
-```
 
 ### Accuracy Progression
 
@@ -363,52 +331,6 @@ Accuracy:          ~65-70% (same)
 Epoch 1:  26.54% → 45.21% (loss: 2.32 → 1.89)
 Epoch 2:  45.21% → 62.34% (loss: 1.89 → 1.56)
 Epoch 3:  62.34% → 62.34% (loss: 1.56 → 1.56) [convergence]
-```
-
-## Troubleshooting During Execution
-
-### Issue: Slow Dataset Download
-
-**Expected:** 2-5 minutes for CIFAR-10
-
-```
-If taking >10 minutes:
-- Check internet speed: speedtest.net
-- Try again later
-- Use VPN if available
-```
-
-### Issue: High Memory Usage (GPU)
-
-**Expected:** ~3-4 GB VRAM usage
-
-```
-If getting CUDA out of memory:
-Edit model_training.py:
-    batch_size = 16  # Reduce from 32
-Then retry.
-```
-
-### Issue: Low Accuracy (<50%)
-
-**Expected:** ~60-70% after 3 epochs
-
-```
-If accuracy too low:
-- Increase num_epochs = 10
-- Reduce learning_rate = 0.0001
-- Use Food-101 instead of CIFAR-10
-```
-
-### Issue: Training Stuck
-
-**Expected:** Progress message every 5-10 seconds
-
-```
-If no messages:
-- Check if model is training (GPU usage)
-- Reduce batch_size if memory issue
-- Check console for errors
 ```
 
 ## Monitoring Training Progress
@@ -473,15 +395,14 @@ with torch.no_grad():
 
 ## Performance Summary
 
-| Metric | CIFAR-10 | Food-101 |
-|--------|----------|----------|
-| Training Accuracy | ~62% | ~75% |
-| Validation Accuracy | ~67% | ~78% |
-| Test Accuracy | ~65% | ~76% |
-| Training Time (GPU) | 7 min | 45 min |
-| Training Time (CPU) | 45 min | 4+ hours |
-| Dataset Size | 170 MB | 4.65 GB |
+| Metric | CIFAR-10 |
+|--------|----------|
+| Training Accuracy | ~62% |
+| Validation Accuracy | ~67% |
+| Test Accuracy | ~65% |
+| Training Time (GPU) | 7 min |
+| Training Time (CPU) | 45 min |
+| Dataset Size | 170 MB |
 
 ---
 
-**Ready to execute?** Start with: `python model_training.py`
