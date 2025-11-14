@@ -5,7 +5,7 @@ This module loads the trained model and evaluates it on the test dataset,
 saving detailed results including confusion matrix and per-class accuracies.
 """
 
-from stat_utils import get_class_accuracy, plot_confusion_matrix
+from evaluation_metrics import get_class_accuracy, plot_confusion_matrix
 from sklearn.metrics import confusion_matrix
 import torchvision.models as models
 import matplotlib.pyplot as plt
@@ -16,14 +16,7 @@ import os
 
 
 def load_test_data():
-    """
-    Load test dataset from pickle file.
-
-    Returns
-    -------
-    tuple
-        (test_dataset, test_loader, batch_size, num_epochs, classes)
-    """
+    """Load test dataset from pickle file."""
     print("\nLoading test dataset...")
 
     try:
@@ -36,26 +29,12 @@ def load_test_data():
         return test_dataset, test_loader, batch_size, num_epochs, classes
     except FileNotFoundError:
         print("Error: Test dataset not found.")
-        print("Please run train.py before running test.")
+        print("Please run model_training.py before running test.")
         sys.exit(1)
 
 
 def load_trained_model(num_classes, device):
-    """
-    Load the trained ResNet50 model.
-
-    Parameters
-    ----------
-    num_classes : int
-        Number of output classes
-    device : torch.device
-        Device to load model on
-
-    Returns
-    -------
-    nn.Module
-        Loaded model
-    """
+    """Load the trained ResNet50 model."""
     print("Loading fine-tuned model...")
 
     try:
@@ -65,7 +44,7 @@ def load_trained_model(num_classes, device):
         )
     except FileNotFoundError:
         print("Error: Fine-tuned model not found.")
-        print("Please run train.py before running test.")
+        print("Please run model_training.py before running test.")
         sys.exit(1)
 
     # Initialize model architecture
@@ -81,25 +60,7 @@ def load_trained_model(num_classes, device):
 
 
 def test_model(model, test_loader, criterion, device):
-    """
-    Test the model on the test dataset.
-
-    Parameters
-    ----------
-    model : nn.Module
-        The model to test
-    test_loader : DataLoader
-        Test data loader
-    criterion : nn.Module
-        Loss function
-    device : torch.device
-        Device to test on
-
-    Returns
-    -------
-    tuple
-        (test_loss, test_accuracy, y_pred, y_true, batch_count)
-    """
+    """Test the model on the test dataset."""
     model.eval()
 
     running_loss = 0.0
@@ -139,32 +100,7 @@ def test_model(model, test_loader, criterion, device):
 def save_test_results(test_loss_history, test_acc_history, cm, 
                      num_classes, classes, class_acc, batch_count, 
                      batch_size, test_loss, test_acc):
-    """
-    Save all test results to files and plots.
-
-    Parameters
-    ----------
-    test_loss_history : list
-        Loss history
-    test_acc_history : list
-        Accuracy history
-    cm : numpy.ndarray
-        Confusion matrix
-    num_classes : int
-        Number of classes
-    classes : list
-        Class names
-    class_acc : numpy.ndarray
-        Per-class accuracies
-    batch_count : int
-        Number of batches
-    batch_size : int
-        Batch size used
-    test_loss : float
-        Final test loss
-    test_acc : float
-        Final test accuracy
-    """
+    """Save all test results to files and plots."""
     print("\nPlotting test data...")
 
     # Create results directory
@@ -176,7 +112,7 @@ def save_test_results(test_loss_history, test_acc_history, cm,
     plt.savefig('test_results/confusion_matrix.png')
     plt.close()
 
-    # Save test summary to text file
+    # Save test summary
     with open('test_results/test_summary.txt', "w") as f:
         f.write("Test Summary\n")
         f.write("-" * 46 + "\n")
