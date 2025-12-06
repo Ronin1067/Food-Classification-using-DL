@@ -1,6 +1,5 @@
 # Contributing to Food Classification Project
 
-We appreciate your interest in contributing to this project! This document provides guidelines and instructions for contributing.
 
 ---
 
@@ -271,25 +270,6 @@ When requesting a feature:
 
 ---
 
-## 📞 Communication
-
-### Channels
-
-- **GitHub Issues** - Bug reports and feature requests
-- **GitHub Discussions** - General questions and discussions
-- **Email** - For sensitive or private matters
-
-### Code of Conduct
-
-We are committed to providing a welcoming and inclusive environment. Please:
-
-- Be respectful of different opinions
-- Provide constructive feedback
-- Help other contributors
-- Report inappropriate behavior
-
----
-
 ## 🎓 Resources
 
 - [GitHub Flow Guide](https://guides.github.com/introduction/flow/)
@@ -312,8 +292,3 @@ We are committed to providing a welcoming and inclusive environment. Please:
 
 ---
 
-Thank you for contributing to make this project better! 🙏
-
-For questions, feel free to reach out to the team:
-- KODURU YAGNESH KUMAR: s20230020313@iiits.in
-- Sanjay P.L.V.V: s20230020334@iiits.in
