@@ -392,9 +392,9 @@ If you use this project in your research or work, please cite:
 ```bibtex
 @software{food_classification_2025,
   title={Food Classification using ResNet50 with Automatic Online Dataset},
-  author={Your Name},
+  author={Yagnesh Kumar Koduru},
   year={2025},
-  url={https://github.com/yourusername/food-classification}
+  url={(https://github.com/Ronin1067/Food-Classification-Using-ResNet-50)}
 }
 ```
 
